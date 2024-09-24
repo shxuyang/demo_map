@@ -1,45 +1,39 @@
 package com.example.service;
 
+import com.example.component.CsvFileParser;
 import com.example.pojo.FoodTruck;
-import com.google.common.collect.Lists;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-import java.io.FileReader;
-import java.io.Reader;
 import java.util.List;
-import java.util.Objects;
 
+/**
+ * @author Sky
+ * @date 2024/9/24 - 0:58
+ */
+@Service
 public class FoodTruckService {
-    public String getNearestFoodTruck(double userLatitude, double userLongitude) {
-        List<FoodTruck> foodTrucks = Lists.newArrayList();
-        String file = Objects.requireNonNull(this.getClass().getClassLoader().getResource("Mobile_Food_Facility_Permit.csv")).getPath();
-        try (Reader in = new FileReader(file)) {
-            CSVParser parser = CSVFormat.DEFAULT
-                    .withFirstRecordAsHeader()
-                    .parse(in);
-            for (CSVRecord record : parser) {
-                double latitude = NumberUtils.toDouble(record.get("Latitude"));
-                double longitude = NumberUtils.toDouble(record.get("Longitude"));
-                String applicant = record.get("Applicant");
-                foodTrucks.add(new FoodTruck(latitude, longitude, applicant));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    @Autowired
+    private CsvFileParser csvFileParser;
 
-        return getResult(userLatitude, userLongitude, foodTrucks);
+    /**
+     * retrieve all FoodTrucks with required fields
+     *
+     * @return
+     */
+    public List<FoodTruck> getAllFoodTruck() {
+        List<FoodTruck> foodTrucks = csvFileParser.readCsvData();
+        return foodTrucks;
     }
 
-    public String getResult(double userLatitude, double userLongitude, List<FoodTruck> foodTrucks) {
+    public FoodTruck getNearestFoodTruck(double userLatitude, double userLongitude) {
+        //Create an instance of the food truck in the current location by the current location of the user
         FoodTruck userLocation = new FoodTruck(userLatitude, userLongitude, "User Location");
 
+        //Find the nearest food truck
         FoodTruck nearestTruck = null;
         double minDistance = Double.MAX_VALUE;
+        List<FoodTruck> foodTrucks = getAllFoodTruck();
         for (FoodTruck truck : foodTrucks) {
             double distance = calculateDistance(userLocation, truck);
             if (distance < minDistance) {
@@ -47,15 +41,17 @@ public class FoodTruckService {
                 nearestTruck = truck;
             }
         }
-
-        String result = StringUtils.EMPTY;
-        if (ObjectUtils.isNotEmpty(nearestTruck)) {
-            result = "The nearest foodTruck is " + nearestTruck.getName() + " and the distance is " + minDistance + " kilometers";
-        }
-        return result;
+        return nearestTruck;
     }
-
+    /**
+     * Haversine formula to calculate the distance latitude and longitude coordinates
+     *
+     * @param userLocation
+     * @param other
+     * @return the distance
+     */
     private double calculateDistance(FoodTruck userLocation, FoodTruck other) {
+        // The average radius of the Earth(kilometers)
         final int R = 6371;
         double latDistance = Math.toRadians(other.getLatitude() - userLocation.getLatitude());
         double lonDistance = Math.toRadians(other.getLongitude() - userLocation.getLongitude());
